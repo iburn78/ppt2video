@@ -7,10 +7,10 @@ from ppt2video.tools import *
 #     google_application_credentials='/config/google_cloud.json'  # Location and filename of your Google Cloud service account key
 # )
 
-image_prefix = '슬라이드'
+image_prefix = 'slide'
 gca ='../config/google_cloud.json'
 
-ppt_file='삼성전자_2024_2Q_K_2024-09-22.pptx'
+ppt_file='yourfile_2024_2Q_K_2024-09-22.pptx'
 lang = 'K'
 meta = Meta(ppt_file=ppt_file, image_prefix=image_prefix, lang=lang, google_application_credentials=gca)
 
@@ -18,7 +18,7 @@ meta = Meta(ppt_file=ppt_file, image_prefix=image_prefix, lang=lang, google_appl
 n = ppt_to_text(meta)
 print(ppt_tts(meta, n))
 
-ppt_file='삼성전자_2024_2Q_E_2024-09-30.pptx'
+ppt_file='yourfile_2024_2Q_E_2024-09-30.pptx'
 lang = 'E'
 meta = Meta(ppt_file=ppt_file, image_prefix=image_prefix, lang=lang, google_application_credentials=gca)
 
