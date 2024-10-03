@@ -1,0 +1,80 @@
+Next time use pyproject.toml method
+ask ChatGPT
+
+### 
+
+To update a package on **PyPI** (Python Package Index), the process is somewhat similar to updating a version in **Git**, but there are a few specific steps you need to follow. When you update a package on PyPI, you need to:
+
+1. **Update the version** of your package.
+2. **Build new distribution files** (wheel and source distributions).
+3. **Upload the new version** to PyPI.
+
+Here’s a detailed guide:
+
+### Steps to Update Your Package on PyPI:
+
+#### 1. **Update the Version in Your `setup.py`**
+- PyPI requires that you increment the version number whenever you upload a new release. For example, if your current version is `0.1.0`, you might update it to `0.2.0` or `1.0.0` based on your changes.
+  
+In your `setup.py`, update the `version` field:
+  
+```python
+setup(
+    name="ppt2video",
+    version="0.2.0",  # Increment the version number
+    ...
+)
+```
+
+#### 2. **Build the Distribution Files**
+- After updating the version, you need to rebuild the distribution files (`.tar.gz` and `.whl`), which will be uploaded to PyPI.
+
+In your project directory (where `setup.py` is located), run:
+```bash
+python setup.py sdist bdist_wheel
+```
+
+This will create a `dist/` folder containing the distribution files (e.g., `ppt2video-0.2.0.tar.gz` and `ppt2video-0.2.0-py3-none-any.whl`).
+
+#### 3. **Upload the New Version with `twine`**
+- After building the new distribution files, you can upload them to PyPI using **Twine**.
+
+If you haven’t already installed `twine`, do so with:
+```bash
+pip install twine
+```
+
+Then, upload the distribution files from the `dist/` folder to PyPI:
+```bash
+twine upload dist/*
+```
+
+- You will be prompted for your **PyPI credentials** (or your API token if you set it up).
+
+#### 4. **Verify the Upload**
+- Once the upload is successful, you can verify that the new version is available on your PyPI package page (e.g., `https://pypi.org/project/ppt2video/`).
+  
+- You should see the new version listed on the page.
+
+#### 5. **Testing the New Version**
+- To make sure the new version is uploaded correctly, you can install it via `pip`:
+  
+  ```bash
+  pip install ppt2video --upgrade
+  ```
+
+This will install the latest version of your package.
+
+### Key Considerations:
+- **Versioning**: PyPI enforces strict versioning. You cannot upload a new version with the same version number. Always increment the version (e.g., `0.1.0` → `0.2.0`).
+  
+- **Changelog**: It’s a good practice to maintain a **CHANGELOG** for your package, so users know what has changed between versions.
+
+- **Automated Releases**: If you regularly update your package, consider using **GitHub Actions** or another CI/CD pipeline to automate testing, building, and releasing your package.
+
+### Example Workflow Summary:
+
+1. **Update version** in `setup.py`.
+2. **Build distributions**: `python setup.py sdist bdist_wheel`.
+3. **Upload to PyPI**: `twine upload dist/*`.
+4. **Verify the upload** on the PyPI website.
