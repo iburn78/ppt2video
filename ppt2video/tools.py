@@ -3,6 +3,7 @@ from pptx import Presentation
 from google.cloud import texttospeech_v1beta1 as tts
 from moviepy.editor import ImageClip, concatenate_videoclips, AudioFileClip
 import os
+import re
 
 @dataclass
 class Meta:
@@ -48,34 +49,59 @@ def ppt_to_video(meta: Meta):
         num = ppt_to_text(meta)
         video_from_ppt(meta, num)
 
+def _clean_text(input_text):
+    # Ensure UTF-8 compatibility: decode and encode to handle encoding correctly
+    input_text = input_text.encode('utf-8').decode('utf-8')
+    
+    # 1. Replace multiple spaces with a single space
+    input_text = re.sub(r'\s+', ' ', input_text)
+    
+    # 2. Remove non-Korean, non-English chars, non-numbers, and special characters except commas, periods, question marks, exclamation marks, and spaces
+    input_text = re.sub(r'[^a-zA-Z0-9가-힣.,?!\n\s]', '', input_text)
+    
+    # 3. Replace multiple newlines with a single newline
+    input_text = re.sub(r'(\n)+', '\n', input_text)
+    
+    # 4. Collapse spaces between \n and \n into a single \n
+    input_text = re.sub(r'(?<=\n)\s+(?=\n)', '', input_text)
+    
+    # 5. Remove any trailing newline at the end of the text
+    input_text = input_text.rstrip('\n')
+    
+    # 6. Remove any space before a newline
+    input_text = re.sub(r'\s+(?=\n)', '', input_text)
+    
+    # Return cleaned text
+    return input_text.strip()
+
+def _write_to_file(content, current_file_number, current_size, meta: Meta):
+    txt_file = f"{os.path.join(meta.voice_path, meta.ppt_file.replace(meta.ppt_extension, ''))}_{current_file_number}.txt"
+
+    mode = 'w' if current_size == 0 else 'a'
+    with open(txt_file, mode, encoding='utf-8') as notes_file:
+        notes_file.write(content)
+    
+    return current_size + len(content.encode('utf-8'))
+
 def ppt_to_text(meta: Meta):
     ppt = Presentation(os.path.join(meta.ppt_path, meta.ppt_file))
     if not meta.voice_enabled:
         return len(ppt.slides)
 
-    def _write_to_file(content, current_file_number, current_size, meta: Meta):
-        txt_file = f"{os.path.join(meta.voice_path, meta.ppt_file.replace(meta.ppt_extension, ''))}_{current_file_number}.txt"
-
-        mode = 'w' if current_size == 0 else 'a'
-        with open(txt_file, mode, encoding='utf-8') as notes_file:
-            notes_file.write(content)
-    
-        return current_size + len(content.encode('utf-8'))
-
-    header = '''<speak>
-    '''
-    footer = '''</speak>
-    '''
+    header = '''<speak>\n'''
+    footer = '''</speak>'''
     file_number = 0
     current_size = _write_to_file(header, file_number, 0, meta)
 
+    mark_separator = '.' # for the Google TTS English engine, MARK tag seems need to be followed by a char.
     for slide_number, slide in enumerate(ppt.slides):
         if slide.notes_slide and slide.notes_slide.notes_text_frame:
             notes = slide.notes_slide.notes_text_frame.text
-            slide_content = f'.<mark name="slide{slide_number}"/>.\n<break time="{round(meta.slide_break/2,1)}s"/>\n'
-            slide_content += notes.replace('\n', f'<break time="{meta.line_break}s"/>\n') + f'<break time="{meta.slide_break}s"/>\n'
+            notes = _clean_text(notes)
+            slide_content = f'<mark name="slide{slide_number}"/>{mark_separator}\n<break time="{round(meta.slide_break/2,1)}s"/>\n'
+            slide_content += notes.replace('\n', f'\n<break time="{meta.line_break}s"/>\n') + f'\n<break time="{meta.slide_break}s"/>\n'
         else:
-            slide_content = f'.<mark name="slide{slide_number}"/>.\n<break time="{meta.slide_break}s"/>\n'
+            slide_content = f'<mark name="slide{slide_number}"/>{mark_separator}\n<break time="{meta.slide_break}s"/>\n'
 
         if current_size + len(slide_content.encode('utf-8')) > meta.max_size:
             _write_to_file(footer, file_number, current_size, meta)
