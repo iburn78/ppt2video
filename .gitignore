@@ -164,3 +164,4 @@ cython_debug/
 # ppt2video specific
 data/
 config/
+note.txt
