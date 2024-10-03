@@ -1,2 +1,2 @@
 # ppt2video
-Tool to convert a PPT to a video with voice (reading the note contents for each slide)
+A tool that converts a PowerPoint (PPT) to a video with voice narration (reading the notes from each slide)
