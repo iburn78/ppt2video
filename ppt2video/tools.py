@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pptx import Presentation
 from google.cloud import texttospeech_v1beta1 as tts
 from moviepy.editor import ImageClip, concatenate_videoclips, AudioFileClip
@@ -19,13 +19,17 @@ class Meta:
     google_application_credentials: str = None  # Location of the Google API key (downloaded as JSON)
     voice_path: str = 'data/voice/'  # Directory to save the generated audio files
     max_size: int = 4500  # Maximum text size limit for a single Google TTS API request (default 5000)
-    slide_break: float = 2  # Time delay (in seconds) between slides
-    line_break: float = 0.7  # Time delay (in seconds) when there's a line break in the text (e.g., '\n')
+    slide_break: float = 1.2  # Time delay (in seconds) between slides
+    line_break: float = 0.5  # Time delay (in seconds) when there's a line break in the text (e.g., '\n')
     lang: str = 'E'  # Language setting: 'E' for English, 'K' for Korean 
     wave: bool = False  # Whether to use Wavenet voices (True or False)
+    speaking_rate_EN: float = 1.1 # English 
+    speaking_rate_KR: float = 1.25 # Korean
 
     # MoviePy video settings
     fps: int = 24  # Frames per second for the video
+    fade_duration: float = 0.15 # Slide fade duration
+    fade_after_slide: list = field(default_factory=list) # fade effect after given slide number: starting from 0
 
 
 def ppt_to_video(meta: Meta): 
@@ -116,25 +120,45 @@ def ppt_to_text(meta: Meta):
 
     return txt_file_number 
 
+def get_text_script_path(meta: Meta, n: int):
+    return f"{os.path.join(meta.voice_path, meta.ppt_file.replace(meta.ppt_extension, '_'+str(n)+'.txt'))}"
+
+def get_voice_file_path(meta: Meta, n: int):
+    return os.path.join(meta.voice_path, meta.ppt_file.replace(meta.ppt_extension, '_'+str(n)+'.mp3'))
+
 
 def ppt_tts(meta: Meta, txt_file_number: int):
 
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = meta.google_application_credentials
 
     client = tts.TextToSpeechClient()
-    language_code = 'ko-KR' if meta.lang == 'K' else 'en-US' 
-    tag = 'D' if meta.lang == 'K' else 'B' 
-    name = language_code+'-Wavenet-'+tag 
+    if meta.lang == 'E':
+        language_code = 'en-US' 
+        speaking_rate = meta.speaking_rate_EN
+        name = 'en-US-Wavenet-B'
+    elif meta.lang == 'K':
+        language_code = 'ko-KR' 
+        speaking_rate = meta.speaking_rate_KR
+        name = 'ko-KR-Wavenet-D'
+    else: # default
+        language_code = 'en-US' 
+        speaking_rate = meta.speaking_rate_EN
+        name = 'en-US-Wavenet-B'
+    
     if meta.wave == True: # WaveNet voice (1 mil words/month vs 4 mil in basic)
         voice = tts.VoiceSelectionParams(language_code=language_code, name=name, ssml_gender=tts.SsmlVoiceGender.MALE)
     else:
         voice = tts.VoiceSelectionParams(language_code=language_code, ssml_gender=tts.SsmlVoiceGender.MALE)
-    audio_config = tts.AudioConfig(audio_encoding=tts.AudioEncoding.MP3)
+
+    audio_config = tts.AudioConfig(
+        audio_encoding=tts.AudioEncoding.MP3, 
+        speaking_rate = speaking_rate
+    )
     
     timepoint_dict = {}
     for i in range(txt_file_number):
-        txt_file = f"{os.path.join(meta.voice_path, meta.ppt_file.replace(meta.ppt_extension, '_'+str(i)+'.txt'))}"
-        voice_file =os.path.join(meta.voice_path, meta.ppt_file.replace(meta.ppt_extension, '_'+str(i)+'.mp3'))
+        txt_file = get_text_script_path(meta, i)
+        voice_file = get_voice_file_path(meta, i)
 
         with open(txt_file, 'r', encoding='utf-8') as file:
             text_content = file.read()
@@ -186,6 +210,15 @@ def video_from_ppt_and_voice(meta: Meta, timepoints, fps=24):
 
             # Load the slide image
             slide_clip = ImageClip(slide_image_path).set_duration(end_time - start_time).set_start(start_time)
+
+            # Apply fade-out to the current slide if it's in fade_after_slide list
+            fade_after_slide_next_one = [i+1 for i in meta.fade_after_slide]
+
+            if slide_number in meta.fade_after_slide:
+                slide_clip = slide_clip.fadeout(meta.fade_duration)
+            if slide_number in fade_after_slide_next_one: 
+                slide_clip = slide_clip.fadein(meta.fade_duration)
+
             video_clips.append(slide_clip)
 
         # Concatenate video clips for the current audio
