@@ -126,7 +126,7 @@ def get_text_script_path(meta: Meta, n: int):
     return f"{os.path.join(meta.voice_path, meta.ppt_file.replace(meta.ppt_extension, '_'+str(n)+'.txt'))}"
 
 def get_voice_file_path(meta: Meta, n: int):
-    return os.path.join(meta.voice_path, meta.ppt_file.replace(meta.ppt_extension, '_'+str(n)+'.mp3'))
+    return os.path.join(meta.voice_path, meta.ppt_file.replace(meta.ppt_extension, '_'+str(n)+'.wav'))
 
 def ppt_tts(meta: Meta, txt_file_number: int):
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = meta.google_application_credentials
@@ -151,7 +151,7 @@ def ppt_tts(meta: Meta, txt_file_number: int):
         voice = tts.VoiceSelectionParams(language_code=language_code, ssml_gender=tts.SsmlVoiceGender.MALE)
 
     audio_config = tts.AudioConfig(
-        audio_encoding=tts.AudioEncoding.MP3, 
+        audio_encoding=tts.AudioEncoding.LINEAR16,
         speaking_rate = speaking_rate
     )
     
@@ -224,7 +224,7 @@ def video_from_ppt_and_voice(meta: Meta, timepoints, fps=24):
 
         # Concatenate video clips for the current audio
         video_for_an_audio_file = concatenate_videoclips(video_clips)
-        video_for_an_audio_file = video_for_an_audio_file.set_audio(audio_clip).volumex(2.5)
+        video_for_an_audio_file = video_for_an_audio_file.set_audio(audio_clip)
         videos_with_diff_audio_files.append(video_for_an_audio_file)
 
     # Concatenate all videos into one final video
