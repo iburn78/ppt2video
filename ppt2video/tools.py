@@ -266,7 +266,8 @@ def video_from_ppt(meta: Meta, num_slides: int, fps=24):
 
 
 
-## Potntial functions to implement 
+## Potntial functions to be implemented
+
 
 # from moviepy.editor import ImageClip, CompositeVideoClip, VideoFileClip
 # from PIL import Image
