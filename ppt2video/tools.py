@@ -13,24 +13,24 @@ class Meta:
     image_prefix: str = 'slide'  # The prefix for image file names (used when saving slides as images)
     image_extension: str = 'PNG'  # The image file format (default is PNG)
     ppt_extension: str = '.pptx'  # The PowerPoint file extension
+    convert_slides_upto_slide_no: int = 0   # Convert to video only slide number upto this
 
     # Google TTS settings
     voice_enabled: bool = True  # Enable or disable voice narration
     google_application_credentials: str = None  # Location of the Google API key (downloaded as JSON)
     voice_path: str = 'data/voice/'  # Directory to save the generated audio files
     max_size: int = 4500  # Maximum text size limit for a single Google TTS API request (default 5000)
-    slide_break: float = 1.2  # Time delay (in seconds) between slides
-    line_break: float = 0.5  # Time delay (in seconds) when there's a line break in the text (e.g., '\n')
+    slide_break: float = 1.3  # Time delay (in seconds) between slides
+    line_break: float = 0.7  # Time delay (in seconds) when there's a line break in the text (e.g., '\n')
     lang: str = 'E'  # Language setting: 'E' for English, 'K' for Korean 
     wave: bool = False  # Whether to use Wavenet voices (True or False)
-    speaking_rate_EN: float = 1.1 # English 
-    speaking_rate_KR: float = 1.25 # Korean
+    speaking_rate_EN: float = 1 # English 
+    speaking_rate_KR: float = 1.2 # Korean
 
     # MoviePy video settings
     fps: int = 24  # Frames per second for the video
     fade_duration: float = 0.15 # Slide fade duration
     fade_after_slide: list = field(default_factory=list) # fade effect after given slide number: starting from 0
-
 
 def ppt_to_video(meta: Meta): 
     if not os.path.exists(meta.ppt_path):
@@ -114,6 +114,8 @@ def ppt_to_text(meta: Meta):
             slide_content = header + slide_content
 
         current_size = _write_to_file(slide_content, file_number, current_size, meta)
+        if meta.convert_slides_upto_slide_no > 0 and slide_number == meta.convert_slides_upto_slide_no:
+            break
 
     _write_to_file(footer, file_number, current_size, meta)
     txt_file_number = file_number+1
@@ -126,9 +128,7 @@ def get_text_script_path(meta: Meta, n: int):
 def get_voice_file_path(meta: Meta, n: int):
     return os.path.join(meta.voice_path, meta.ppt_file.replace(meta.ppt_extension, '_'+str(n)+'.mp3'))
 
-
 def ppt_tts(meta: Meta, txt_file_number: int):
-
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = meta.google_application_credentials
 
     client = tts.TextToSpeechClient()
@@ -180,17 +180,18 @@ def ppt_tts(meta: Meta, txt_file_number: int):
         if response.timepoints:
             for time_point in response.timepoints:
                 print(f'Mark name: {time_point.mark_name}, Time: {time_point.time_seconds} seconds')
-                timepoint_list.append([int(time_point.mark_name[5:]), time_point.time_seconds])
+                timepoint_list.append([int(time_point.mark_name[5:]), time_point.time_seconds]) # mark_name = 'slide#'
         else:
             print('No timepoints found.')
         timepoint_dict[voice_file] = timepoint_list
 
     return timepoint_dict
 
+
 def video_from_ppt_and_voice(meta: Meta, timepoints, fps=24):
     images_path = os.path.join(meta.ppt_path, meta.ppt_file.replace(meta.ppt_extension,''))
     output_file = os.path.join(meta.ppt_path, meta.ppt_file.replace(meta.ppt_extension, '.mp4'))
-    video_with_audios = []
+    videos_with_diff_audio_files = []
 
     for audio_file, slide_times in timepoints.items():
         audio_clip = AudioFileClip(audio_file)
@@ -222,12 +223,12 @@ def video_from_ppt_and_voice(meta: Meta, timepoints, fps=24):
             video_clips.append(slide_clip)
 
         # Concatenate video clips for the current audio
-        video_with_audio = concatenate_videoclips(video_clips)
-        video_with_audio = video_with_audio.set_audio(audio_clip).volumex(2)
-        video_with_audios.append(video_with_audio)
+        video_for_an_audio_file = concatenate_videoclips(video_clips)
+        video_for_an_audio_file = video_for_an_audio_file.set_audio(audio_clip).volumex(2.5)
+        videos_with_diff_audio_files.append(video_for_an_audio_file)
 
     # Concatenate all videos into one final video
-    final_video = concatenate_videoclips(video_with_audios)
+    final_video = concatenate_videoclips(videos_with_diff_audio_files)
 
     # Set fps for the final video
     final_video.fps = fps
@@ -255,13 +256,34 @@ def video_from_ppt(meta: Meta, num_slides: int, fps=24):
         video_clips.append(slide_clip)
 
     final_video = concatenate_videoclips(video_clips)
-
-    # Set fps for the final video
     final_video.fps = fps
     
-    # final_video.write_videofile(output_file, codec="libx264")
     final_video.write_videofile(
         output_file,
         codec="libx264",
     )
     print('video generated and saved')
+
+
+
+## Potntial functions to implement 
+
+# from moviepy.editor import ImageClip, CompositeVideoClip, VideoFileClip
+# from PIL import Image
+# Image.ANTIALIAS=Image.LANCZOS
+
+# insert_image = ''
+# insert_clip = ImageClip(insert_image)
+# insert_size = insert_clip.size
+# insert_height = insert_size[1]/2
+# insert_position = (0,0)  # ('center', 'bottom')
+# insert_clip = insert_clip.resize(height=insert_height).set_position(insert_position)
+# insert_clip = insert_clip.set_start(0).set_duration(2).crossfadein(0.2).crossfadeout(0.2)
+# main_video = VideoFileClip('')
+# final_video = CompositeVideoClip([main_video, insert_clip]) # first element will be the bottom 
+# output_file = ''
+# final_video.write_videofile(
+    # output_file,
+    # codec="libx264",
+    # fps=24
+# )
