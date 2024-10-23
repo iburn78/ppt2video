@@ -4,6 +4,9 @@ from google.cloud import texttospeech_v1beta1 as tts
 from moviepy.editor import ImageClip, concatenate_videoclips, AudioFileClip
 import os
 import re
+from moviepy.editor import CompositeVideoClip, VideoFileClip
+from PIL import Image 
+Image.ANTIALIAS=Image.LANCZOS
 
 @dataclass
 class Meta:
@@ -31,6 +34,11 @@ class Meta:
     fps: int = 24  # Frames per second for the video
     fade_duration: float = 0.15 # Slide fade duration
     fade_after_slide: list = field(default_factory=list) # fade effect after given slide number: starting from 0
+    target_slide_for_video: list = field(default_factory=list)
+    video_file_path: list = field(default_factory=list)
+    video_height_scale: list = field(default_factory=list)
+    video_location: list = field(default_factory=list)
+    video_interrupt: bool = False
 
 def ppt_to_video(meta: Meta): 
     if not os.path.exists(meta.ppt_path):
@@ -48,7 +56,8 @@ def ppt_to_video(meta: Meta):
             os.makedirs(meta.voice_path)
         num = ppt_to_text(meta)
         timepoints = ppt_tts(meta, num)
-        video_from_ppt_and_voice(meta, timepoints)
+        # video_from_ppt_and_voice(meta, timepoints)
+        composite_video_from_ppt_and_voice(meta, timepoints)
     else:
         num = ppt_to_text(meta)
         video_from_ppt(meta, num)
@@ -56,25 +65,26 @@ def ppt_to_video(meta: Meta):
 def _clean_text(input_text):
     # Ensure UTF-8 compatibility: decode and encode to handle encoding correctly
     input_text = input_text.encode('utf-8').decode('utf-8')
-    
-    # 1. Replace multiple spaces with a single space
+
+    # 2. Replace multiple spaces with a single space
     input_text = re.sub(r'\s+', ' ', input_text)
-    
-    # 2. Remove non-Korean, non-English chars, non-numbers, and special characters except commas, periods, question marks, exclamation marks, and spaces
+
+    # 3. Remove non-Korean, non-English chars, non-numbers, and special characters 
+    # except commas, periods, question marks, exclamation marks, and spaces
     input_text = re.sub(r'[^a-zA-Z0-9가-힣.,?!\n\s]', '', input_text)
-    
-    # 3. Replace multiple newlines with a single newline
+
+    # 4. Replace multiple newlines with a single newline
     input_text = re.sub(r'(\n)+', '\n', input_text)
-    
-    # 4. Collapse spaces between \n and \n into a single \n
+
+    # 5. Collapse spaces between \n and \n into a single \n
     input_text = re.sub(r'(?<=\n)\s+(?=\n)', '', input_text)
-    
-    # 5. Remove any trailing newline at the end of the text
+
+    # 6. Remove any trailing newline at the end of the text
     input_text = input_text.rstrip('\n')
-    
-    # 6. Remove any space before a newline
+
+    # 7. Remove any space before a newline
     input_text = re.sub(r'\s+(?=\n)', '', input_text)
-    
+
     # Return cleaned text
     return input_text.strip()
 
@@ -211,6 +221,90 @@ def video_from_ppt_and_voice(meta: Meta, timepoints, fps=24):
 
             # Load the slide image
             slide_clip = ImageClip(slide_image_path).set_duration(end_time - start_time).set_start(start_time)
+
+            # Apply fade-out to the current slide if it's in fade_after_slide list
+            fade_after_slide_next_one = [i+1 for i in meta.fade_after_slide]
+
+            if slide_number in meta.fade_after_slide:
+                slide_clip = slide_clip.fadeout(meta.fade_duration)
+            if slide_number in fade_after_slide_next_one: 
+                slide_clip = slide_clip.fadein(meta.fade_duration)
+
+            video_clips.append(slide_clip)
+
+        # Concatenate video clips for the current audio
+        video_for_an_audio_file = concatenate_videoclips(video_clips)
+        video_for_an_audio_file = video_for_an_audio_file.set_audio(audio_clip)
+        videos_with_diff_audio_files.append(video_for_an_audio_file)
+
+    # Concatenate all videos into one final video
+    final_video = concatenate_videoclips(videos_with_diff_audio_files)
+
+    # Set fps for the final video
+    final_video.fps = fps
+    
+    # final_video.write_videofile(output_file, codec="libx264")
+    final_video.write_videofile(
+        output_file,
+        codec="libx264",
+    )
+    print('video with audio generated and saved')
+
+def composite_video_from_ppt_and_voice(meta: Meta, timepoints, fps=24):
+    images_path = os.path.join(meta.ppt_path, meta.ppt_file.replace(meta.ppt_extension,''))
+    output_file = os.path.join(meta.ppt_path, meta.ppt_file.replace(meta.ppt_extension, '.mp4'))
+    videos_with_diff_audio_files = []
+
+    for audio_file, slide_times in timepoints.items():
+        audio_clip = AudioFileClip(audio_file)
+
+        video_clips = []
+        for i in range(len(slide_times)):
+            start_time = slide_times[i][1] # Get the start time for the slide
+            if i < len(slide_times)-1:
+                end_time = slide_times[i + 1][1] # Get the end time for the next slide
+            else:
+                end_time = audio_clip.duration 
+            slide_number = slide_times[i][0]
+
+            # Construct the image filename
+            slide_image_filename = f'{meta.image_prefix}{slide_number}.PNG'
+            slide_image_path = os.path.join(images_path, slide_image_filename)
+
+            # Load the slide image
+
+            if slide_number in meta.target_slide_for_video:
+                slide_clip = ImageClip(slide_image_path)
+                
+                ith = meta.target_slide_for_video.index(slide_number)
+                vc_path = os.path.join(meta.ppt_path, meta.video_file_path[ith])
+                video_overlay = VideoFileClip(vc_path)
+                lv = video_overlay.duration
+                if lv + 0.5 > end_time-start_time: 
+                    raise Exception(f'Composite Video Duration Error at slide: {slide_number}')
+                video_overlay = video_overlay.set_duration(end_time-start_time)
+
+                print(f'---------')
+                print(f'pricessing slide {slide_number}')
+                print(f'slide size (w, h) = ({slide_clip.w}, {slide_clip.h})')
+                print(f'original video size (w, h) = ({video_overlay.w}, {video_overlay.h})')
+                if meta.video_interrupt == True: 
+                    user_input = input("Type 'y' to continue or any other key to halt the process: ")
+                    if user_input.lower() == 'y':
+                        print("Continuing the process...")
+                    else:
+                        print("Halting the process...")
+                        exit()                    
+                print(f'---------')
+
+                video_overlay = video_overlay.resize(height=slide_clip.h*meta.video_height_scale[ith])  
+                video_overlay = video_overlay.set_position(meta.video_location[ith])  
+                
+                # Composite the video on top of the slide image
+                slide_clip = CompositeVideoClip([slide_clip, video_overlay])
+                slide_clip = slide_clip.set_duration(end_time - start_time).set_start(start_time)
+            else: 
+                slide_clip = ImageClip(slide_image_path).set_duration(end_time - start_time).set_start(start_time)
 
             # Apply fade-out to the current slide if it's in fade_after_slide list
             fade_after_slide_next_one = [i+1 for i in meta.fade_after_slide]
