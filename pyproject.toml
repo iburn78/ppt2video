@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ppt2video"
-version = "0.1.7"
+version = "0.1.9"
 description = "A tool to convert a PowerPoint (PPT or PPTX) to a video with voice that reads the notes for each slide."
 readme = "README.md"
 requires-python = ">=3.6"
@@ -34,7 +34,7 @@ where = ["."]
 include = ["ppt2video"]  # Specify the package explicitly
 
 [changelog]
-date = "2024-10-10"
+date = "2024-10-29"
 improvements = [
-    "a few functionalities are added.",
+    "ppt slide image saving automated (only for Windows env)",
 ]

@@ -4,6 +4,7 @@ from google.cloud import texttospeech_v1beta1 as tts
 from moviepy.editor import ImageClip, concatenate_videoclips, AudioFileClip
 import os
 import re
+import win32com.client
 from moviepy.editor import CompositeVideoClip, VideoFileClip
 from PIL import Image 
 Image.ANTIALIAS=Image.LANCZOS
@@ -11,23 +12,24 @@ Image.ANTIALIAS=Image.LANCZOS
 @dataclass
 class Meta:
     # PPT settings
-    ppt_file: str 
+    ppt_file: str # name does not need to include .pptx 
     ppt_path: str = 'data/ppt/'  # Directory for the PPT and image files
     image_prefix: str = 'slide'  # The prefix for image file names (used when saving slides as images)
-    image_extension: str = 'PNG'  # The image file format (default is PNG)
+    image_extension: str = 'png'  # The image file format 
     ppt_extension: str = '.pptx'  # The PowerPoint file extension
     convert_slides_upto_slide_no: int = 0   # Convert to video only slide number upto this
+    save_slide_images: bool = True # Save slides automatically from PPT, although there are already saved slides (works only under windows, if you have PowerPoint software)
 
     # Google TTS settings
     voice_enabled: bool = True  # Enable or disable voice narration
     google_application_credentials: str = None  # Location of the Google API key (downloaded as JSON)
     voice_path: str = 'data/voice/'  # Directory to save the generated audio files
     max_size: int = 4500  # Maximum text size limit for a single Google TTS API request (default 5000)
-    slide_break: float = 1.3  # Time delay (in seconds) between slides
-    line_break: float = 0.7  # Time delay (in seconds) when there's a line break in the text (e.g., '\n')
+    slide_break: float = 1.0  # Time delay (in seconds) between slides
+    line_break: float = 0.5  # Time delay (in seconds) when there's a line break in the text (e.g., '\n')
     lang: str = 'E'  # Language setting: 'E' for English, 'K' for Korean 
     wave: bool = False  # Whether to use Wavenet voices (True or False)
-    speaking_rate_EN: float = 1 # English 
+    speaking_rate_EN: float = 1.1 # English 
     speaking_rate_KR: float = 1.2 # Korean
 
     # MoviePy video settings
@@ -43,6 +45,11 @@ class Meta:
 def ppt_to_video(meta: Meta): 
     if not os.path.exists(meta.ppt_path):
         os.makedirs(meta.ppt_path)
+    
+    meta.ppt_file = (meta.ppt_file if meta.ppt_file.endswith(meta.ppt_extension) else meta.ppt_file + meta.ppt_extension)
+
+    if meta.save_slide_images:
+        save_ppt_as_images(meta)
 
     if meta.voice_enabled:
         if meta.google_application_credentials == None:
@@ -216,7 +223,7 @@ def video_from_ppt_and_voice(meta: Meta, timepoints, fps=24):
             slide_number = slide_times[i][0]
 
             # Construct the image filename
-            slide_image_filename = f'{meta.image_prefix}{slide_number}.PNG'
+            slide_image_filename = f'{meta.image_prefix}{slide_number}.{meta.image_extension}'
             slide_image_path = os.path.join(images_path, slide_image_filename)
 
             # Load the slide image
@@ -268,7 +275,7 @@ def composite_video_from_ppt_and_voice(meta: Meta, timepoints, fps=24):
             slide_number = slide_times[i][0]
 
             # Construct the image filename
-            slide_image_filename = f'{meta.image_prefix}{slide_number}.PNG'
+            slide_image_filename = f'{meta.image_prefix}{slide_number}.{meta.image_extension}'
             slide_image_path = os.path.join(images_path, slide_image_filename)
 
             # Load the slide image
@@ -293,8 +300,7 @@ def composite_video_from_ppt_and_voice(meta: Meta, timepoints, fps=24):
                     if user_input.lower() == 'y':
                         print("Continuing the process...")
                     else:
-                        print("Halting the process...")
-                        exit()                    
+                        raise Exception(f'Halting the process...')
                 print(f'---------')
 
                 video_overlay = video_overlay.resize(height=slide_clip.h*meta.video_height_scale[ith])  
@@ -359,26 +365,21 @@ def video_from_ppt(meta: Meta, num_slides: int, fps=24):
     print('video generated and saved')
 
 
+def save_ppt_as_images(meta: Meta):
+    slide_folder = os.path.abspath(os.path.join(meta.ppt_path, meta.ppt_file.replace(meta.ppt_extension, '')))
+    os.makedirs(slide_folder, exist_ok=True)
 
-## Potntial functions to be implemented
+    # Initialize PowerPoint
+    ppt_app = win32com.client.Dispatch("PowerPoint.Application")
+    ppt_file = os.path.abspath(os.path.join(meta.ppt_path, meta.ppt_file))
+    presentation = ppt_app.Presentations.Open(ppt_file, WithWindow=False)
 
+    # Loop through slides and save each as an image
+    for i, slide in enumerate(presentation.Slides):
+        image_path = os.path.join(slide_folder, f'{meta.image_prefix}{i}.{meta.image_extension}')
+        slide.Export(image_path, "PNG")
+        print(f"Saved slide {i} to {image_path}")
 
-# from moviepy.editor import ImageClip, CompositeVideoClip, VideoFileClip
-# from PIL import Image
-# Image.ANTIALIAS=Image.LANCZOS
-
-# insert_image = ''
-# insert_clip = ImageClip(insert_image)
-# insert_size = insert_clip.size
-# insert_height = insert_size[1]/2
-# insert_position = (0,0)  # ('center', 'bottom')
-# insert_clip = insert_clip.resize(height=insert_height).set_position(insert_position)
-# insert_clip = insert_clip.set_start(0).set_duration(2).crossfadein(0.2).crossfadeout(0.2)
-# main_video = VideoFileClip('')
-# final_video = CompositeVideoClip([main_video, insert_clip]) # first element will be the bottom 
-# output_file = ''
-# final_video.write_videofile(
-    # output_file,
-    # codec="libx264",
-    # fps=24
-# )
+    # Close the presentation
+    presentation.Close()
+    ppt_app.Quit()
