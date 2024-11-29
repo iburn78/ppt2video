@@ -28,7 +28,9 @@ class Meta:
     slide_break: float = 1.0  # Time delay (in seconds) between slides
     line_break: float = 0.5  # Time delay (in seconds) when there's a line break in the text (e.g., '\n')
     lang: str = 'E'  # Language setting: 'E' for English, 'K' for Korean 
-    wave: bool = False  # Whether to use Wavenet voices (True or False)
+    wave: bool = True  # Whether to use Wavenet voices (True or False)
+    wave_E: str = 'D'
+    wave_K: str = 'C'
     speaking_rate_EN: float = 1.1 # English 
     speaking_rate_KR: float = 1.2 # Korean
 
@@ -77,8 +79,8 @@ def _clean_text(input_text):
     input_text = re.sub(r'\s+', ' ', input_text)
 
     # 3. Remove non-Korean, non-English chars, non-numbers, and special characters 
-    # except commas, periods, question marks, exclamation marks, and spaces
-    input_text = re.sub(r'[^a-zA-Z0-9가-힣.,?!\n\s]', '', input_text)
+    # except commas, periods, question marks, exclamation marks, spaces, % and $
+    input_text = re.sub(r'[^a-zA-Z0-9가-힣.,?!%\$\n\s]', '', input_text)
 
     # 4. Replace multiple newlines with a single newline
     input_text = re.sub(r'(\n)+', '\n', input_text)
@@ -152,15 +154,15 @@ def ppt_tts(meta: Meta, txt_file_number: int):
     if meta.lang == 'E':
         language_code = 'en-US' 
         speaking_rate = meta.speaking_rate_EN
-        name = 'en-US-Wavenet-B'
+        name = 'en-US-Wavenet-' + meta.wave_E
     elif meta.lang == 'K':
         language_code = 'ko-KR' 
         speaking_rate = meta.speaking_rate_KR
-        name = 'ko-KR-Wavenet-D'
+        name = 'ko-KR-Wavenet-' + meta.wave_K
     else: # default
         language_code = 'en-US' 
         speaking_rate = meta.speaking_rate_EN
-        name = 'en-US-Wavenet-B'
+        name = 'en-US-Wavenet-' + meta.wave_E
     
     if meta.wave == True: # WaveNet voice (1 mil words/month vs 4 mil in basic)
         voice = tts.VoiceSelectionParams(language_code=language_code, name=name, ssml_gender=tts.SsmlVoiceGender.MALE)

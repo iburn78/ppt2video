@@ -60,7 +60,9 @@ class Meta:
     slide_break: float = 1.0  # Time delay (in seconds) between slides
     line_break: float = 0.5  # Time delay (in seconds) when there's a line break in the text (e.g., '\n')
     lang: str = 'E'  # Language setting: 'E' for English, 'K' for Korean 
-    wave: bool = False  # Whether to use Wavenet voices (True or False)
+    wave: bool = True  # Whether to use Wavenet voices (True or False)
+    wave_E: str = 'D'
+    wave_K: str = 'C'
     speaking_rate_EN: float = 1.1 # English 
     speaking_rate_KR: float = 1.2 # Korean
 
