@@ -75,24 +75,15 @@ def _clean_text(input_text):
     # Ensure UTF-8 compatibility: decode and encode to handle encoding correctly
     input_text = input_text.encode('utf-8').decode('utf-8')
 
-    # 2. Replace multiple spaces with a single space
-    input_text = re.sub(r'\s+', ' ', input_text)
-
-    # 3. Remove non-Korean, non-English chars, non-numbers, and special characters 
+    # Remove non-Korean, non-English chars, non-numbers, and special characters 
     # except commas, periods, question marks, exclamation marks, spaces, % and $
     input_text = re.sub(r'[^a-zA-Z0-9가-힣.,?!%\$\n\s]', '', input_text)
 
-    # 4. Replace multiple newlines with a single newline
-    input_text = re.sub(r'(\n)+', '\n', input_text)
+    # Remove all newlines
+    input_text = input_text.replace('\n', '') 
 
-    # 5. Collapse spaces between \n and \n into a single \n
-    input_text = re.sub(r'(?<=\n)\s+(?=\n)', '', input_text)
-
-    # 6. Remove any trailing newline at the end of the text
-    input_text = input_text.rstrip('\n')
-
-    # 7. Remove any space before a newline
-    input_text = re.sub(r'\s+(?=\n)', '', input_text)
+    # Replace multiple spaces with a single space
+    input_text = re.sub(r'\s+', ' ', input_text)
 
     # Return cleaned text
     return input_text.strip()
