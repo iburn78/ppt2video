@@ -31,7 +31,7 @@ class Meta:
     wave: bool = True  # Whether to use Wavenet voices (True or False)
     wave_E: str = 'D'
     wave_K: str = 'C'
-    speaking_rate_EN: float = 1.1 # English 
+    speaking_rate_EN: float = 1.2 # English 
     speaking_rate_KR: float = 1.2 # Korean
 
     # MoviePy video settings
@@ -64,7 +64,7 @@ def ppt_to_video(meta: Meta):
         if not os.path.exists(meta.voice_path):
             os.makedirs(meta.voice_path)
         num = ppt_to_text(meta)
-        timepoints = ppt_tts(meta, num)
+        timepoints, total_duration = ppt_tts(meta, num)
         # video_from_ppt_and_voice(meta, timepoints)
         composite_video_from_ppt_and_voice(meta, timepoints)
     else:
@@ -166,6 +166,7 @@ def ppt_tts(meta: Meta, txt_file_number: int):
     )
     
     timepoint_dict = {}
+    total_duration = 0
     for i in range(txt_file_number):
         txt_file = get_text_script_path(meta, i)
         voice_file = get_voice_file_path(meta, i)
@@ -186,6 +187,9 @@ def ppt_tts(meta: Meta, txt_file_number: int):
             out.write(response.audio_content)
             print(voice_file + ' done')
 
+        with AudioFileClip(voice_file) as voice_clip:
+            total_duration += voice_clip.duration
+
         timepoint_list = []
         if response.timepoints:
             for time_point in response.timepoints:
@@ -195,7 +199,9 @@ def ppt_tts(meta: Meta, txt_file_number: int):
             print('No timepoints found.')
         timepoint_dict[voice_file] = timepoint_list
 
-    return timepoint_dict
+    print(f"Total duration of voice files is {total_duration}")
+
+    return timepoint_dict, total_duration
 
 
 def video_from_ppt_and_voice(meta: Meta, timepoints, fps=24):
