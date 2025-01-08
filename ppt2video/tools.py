@@ -76,8 +76,8 @@ def _clean_text(input_text):
     input_text = input_text.encode('utf-8').decode('utf-8')
 
     # Remove non-Korean, non-English chars, non-numbers, and special characters 
-    # except commas, periods, question marks, exclamation marks, spaces, % and $
-    input_text = re.sub(r'[^a-zA-Z0-9가-힣.,?!%\$\n\s]', '', input_text)
+    # except commas, periods, question marks, exclamation marks, spaces, %, $, &, -
+    input_text = re.sub(r'[^a-zA-Z0-9가-힣.,?!%\$\n\s&-]', '', input_text)
 
     # Remove all newlines
     input_text = input_text.replace('\n', '') 
